@@ -142,7 +142,7 @@ async def chat(request: ChatRequest) -> ApiResponse:
     return ApiResponse(data=ai_response)
 
 
-@app.get("/api/sessions", summary="取得所有会话名称，前端用于渲染会话列表")
+@app.get("/api/sessions", summary="获取所有会话列表，按时间顺序降序排列（最新的会话排在最前）")
 async def sessions():
     """获取所有会话列表，按时间顺序降序排列（最新的会话排在最前）"""
     sessions_list = []
@@ -153,6 +153,20 @@ async def sessions():
     sessions_list.sort(reverse=True)
     return ApiResponse(data=sessions_list)
 
+
+@app.get("/api/sessions/{session_name}", summary="获取指定会话数据", response_model=ApiResponse)
+async def session_find(session_name: str):
+    """获取指定会话数据"""
+    print(f"获取会话数据:{session_name}")
+    session_path = get_session_path(session_name)
+    # 1.验证会话文件是否存在
+    if not os.path.exists(session_path):
+        return ApiResponse(code=404, message="会话不存在")
+    # 2.读取会话文件内容
+    with open(session_path, 'r', encoding='utf-8') as f:
+        session_data = json.load(f)
+    # 3.返回响应，数据为会话数据
+    return ApiResponse(data=session_data)
 
 if __name__ == '__main__':
     import uvicorn
