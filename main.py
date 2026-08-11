@@ -99,7 +99,9 @@ async def create_session(request: CreateSessionRequest):
 
 
 @app.post('/api/chat')
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest) -> ApiResponse:
+    """AI伴侣聊天"""
+    print(f"与AI交互:{request.session_name} : {request.message}")
     # 1.从会话session_name.json文件中读取会话数据
     session_path = get_session_path(request.session_name)
     if not os.path.exists(session_path):
@@ -107,10 +109,33 @@ async def chat(request: ChatRequest):
     with open(session_path, 'r', encoding='utf-8') as f:
         session_data = json.load(f)
 
+    # 2.拼接系统提示词
+    system_prompt = SYSTEM_PROMPT_TEMPLATE % (request.nick_name, request.nature)
 
+    # 3.构建消息列表
+    messages = [{"role": "system", "content": system_prompt}]
+    for message in session_data["message"]:
+        messages.append(message)
+    messages.append({"role": "user", "content": request.message})
 
+    # 4.调用Deepseek API进行聊天
+    response = client.chat.completions.create(
+        model="deepseek-v4-pro",
+        messages=messages,
+        stream=False
+    )
+    content = response.choices[0].message.content
+    session_data["message"].append({
+        "role": "assistant",
+        "content": content
+    })
 
+    # 5.将会话数据写回会话文件
+    with open(session_path, 'w', encoding='utf-8') as f:
+        json.dump(session_data, f, ensure_ascii=False, indent=4)
 
+    # 6.返回响应，数据为AI的回复内容
+    return ApiResponse(data=content)
 
 if __name__ == '__main__':
     import uvicorn
