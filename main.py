@@ -36,8 +36,11 @@ class CreateSessionRequest(BaseModel):
     nick_name : str
     nature : str
 
-class chat_request(BaseModel):
-
+class ChatRequest(BaseModel):
+    session_name: str
+    message: str
+    nick_name: str
+    nature: str
 
 # --------功能函数--------
 def generate_session_name():
@@ -93,6 +96,18 @@ async def create_session(request: CreateSessionRequest):
         json.dump(session_data, f, ensure_ascii=False, indent=4)
     # 4返回响应，数据为会话名称
     return ApiResponse(data=session_name)
+
+
+@app.post('/api/chat')
+async def chat(request: ChatRequest):
+    # 1.从会话session_name.json文件中读取会话数据
+    session_path = get_session_path(request.session_name)
+    if not os.path.exists(session_path):
+        return ApiResponse(code=404, message="会话不存在")
+    with open(session_path, 'r', encoding='utf-8') as f:
+        session_data = json.load(f)
+
+
 
 
 
