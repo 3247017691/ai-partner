@@ -120,7 +120,7 @@ async def chat(request: ChatRequest) -> ApiResponse:
 
     # 4.调用Deepseek API进行聊天
     response = client.chat.completions.create(
-        model="deepseek-v4-pro",
+        model="deepseek-v4-flash",
         messages=messages,
         stream=False
     )
@@ -140,6 +140,18 @@ async def chat(request: ChatRequest) -> ApiResponse:
 
     # 8.返回响应，数据为AI的回复内容
     return ApiResponse(data=ai_response)
+
+
+@app.get("/api/sessions", summary="取得所有会话名称，前端用于渲染会话列表")
+async def sessions():
+    """获取所有会话列表，按时间顺序降序排列（最新的会话排在最前）"""
+    sessions_list = []
+    for filename in os.listdir(SESSIONS_DIR):
+        if filename.endswith(".json"):
+            session_name = filename[:-5]  # 去掉.json后缀
+            sessions_list.append(session_name)
+    sessions_list.sort(reverse=True)
+    return ApiResponse(data=sessions_list)
 
 
 if __name__ == '__main__':
