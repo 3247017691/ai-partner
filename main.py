@@ -50,7 +50,7 @@ def generate_session_name():
 
 # 保存为函数f"sessions/{session_name}.json"
 def get_session_path(session_name):
-    return f"sessions/{session_name}.json"
+    return f"{SESSIONS_DIR}/{session_name}.json"
 
 
 
