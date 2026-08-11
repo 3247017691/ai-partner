@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from typing import Any
 import os
 import json
+from openai import OpenAI
+
+
 
 from pydantic import BaseModel
 
@@ -31,7 +34,26 @@ def generate_session_name():
 def get_session_path(session_name):
     return f"session/{session_name}.json"
 
-# --------路由函数--------
+# 系统提示词模板
+SYSTEM_PROMPT_TEMPLATE = """你叫 %s，现在是用户的真实伴侣，请完全代入伴侣角色。
+    规则：
+        1. 每次只回1条消息
+        2. 禁止任何场景或状态描述性文字
+        3. 匹配用户的语言
+        4. 回复简短，像微信聊天一样
+        5. 有需要的话可以用❤️🌸等emoji表情
+        6. 用符合伴侣性格的方式对话
+        7. 回复的内容, 要充分体现伴侣的性格特征
+        8. 不要太肉麻（比如想你之类的，就日常聊天）
+    伴侣性格：
+        - %s
+    你必须严格遵守上述规则来回复用户。
+    """
+
+# 初始化OpenAI客户端
+client = OpenAI(api_key=os.environ.get('DEEPSEEK_API_KEY'),base_url="https://api.deepseek.com")
+
+
 
 @app.get("/", summary="根路径")
 async def read_root():
@@ -69,6 +91,8 @@ async def create_session(request: CreateSessionRequest):
         json.dump(session_data, f, ensure_ascii=False, indent=4)
     # 4返回响应，数据为会话名称
     return ApiResponse(data=session_name)
+
+
 
 
 if __name__ == '__main__':
