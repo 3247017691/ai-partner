@@ -28,7 +28,7 @@ def generate_session_name():
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 # 保存为函数f"session/{session_name}.json"
-def save_session(session_name):
+def get_session_path(session_name):
     return f"session/{session_name}.json"
 
 # --------路由函数--------
@@ -65,7 +65,7 @@ async def create_session(request: CreateSessionRequest):
         "message": []
     }
     # 3.将会话名称保存成json文件，文件名称是.json，转存为session目录里
-    with open(save_session(session_name), 'w', encoding='utf-8') as f:
+    with open(get_session_path(session_name), 'w', encoding='utf-8') as f:
         json.dump(session_data, f, ensure_ascii=False, indent=4)
     # 4返回响应，数据为会话名称
     return ApiResponse(data=session_name)
