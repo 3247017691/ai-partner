@@ -46,7 +46,14 @@ def generate_session_name():
 async def create_session(request: CreateSessionRequest):
     # 1.准备会话名称
     session_name = generate_session_name()
-
+    # 2.封装会话数据
+    session_data = {
+        "session_name": session_name,
+        "nick_name": request.nick_name,
+        "nature": request.nature,
+        "message": []
+    }
+    # 3.将会话名称
     return ApiResponse()
 
 
