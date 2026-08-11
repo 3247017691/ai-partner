@@ -21,6 +21,24 @@ class CreateSessionRequest(BaseModel):
     nature : str
 
 
+# --------功能函数--------
+def generate_session_name():
+    """生成会话名称"""
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+# 保存为函数f"session/{session_name}.json"
+def save_session(session_name):
+    return f"session/{session_name}.json"
+
+# --------路由函数--------
+
+@app.get("/", summary="根路径")
+async def read_root():
+    return {"message": "Hello World"}
+
+
+
 @app.get("/api/presets", summary='取得所有AI伴侣预设数据，前端用于渲染选择下拉框')
 async def presets():
     # 1.如果预设的json文件不存在，就直接返回响应，相应信息“找不到预设信息”
@@ -35,13 +53,6 @@ async def presets():
     return ApiResponse(data=presets_list)
 
 
-def generate_session_name():
-    """生成会话名称"""
-    #根据当前时间，命名为会话名称，格式为：YYYY-MM-DD_HH-MM-SS
-    from datetime import datetime
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
-
 @app.post("/api/sessions", summary="新建会话")
 async def create_session(request: CreateSessionRequest):
     # 1.准备会话名称
@@ -53,8 +64,11 @@ async def create_session(request: CreateSessionRequest):
         "nature": request.nature,
         "message": []
     }
-    # 3.将会话名称
-    return ApiResponse()
+    # 3.将会话名称保存成json文件，文件名称是.json，转存为session目录里
+    with open(save_session(session_name), 'w', encoding='utf-8') as f:
+        json.dump(session_data, f, ensure_ascii=False, indent=4)
+    # 4返回响应，数据为会话名称
+    return ApiResponse(data=session_name)
 
 
 if __name__ == '__main__':
