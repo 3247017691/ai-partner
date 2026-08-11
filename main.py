@@ -16,6 +16,10 @@ class ApiResponse(BaseModel):
     message: str = "操作成功"
     data: Any = None
 
+class CreateSessionRequest(BaseModel):
+    nick_name : str
+    nature : str
+
 
 @app.get("/api/presets", summary='取得所有AI伴侣预设数据，前端用于渲染选择下拉框')
 async def presets():
@@ -25,10 +29,25 @@ async def presets():
     # 2.如果预设的json文件存在，就读取文件内容并返回
     with open(PRESET_FILE_PATH, 'r', encoding='utf-8') as f:
         presets_list = json.load(f)
-    # 然后按每个预设信息的sort_order进行排序排列
+    # 3然后按每个预设信息的sort_order进行排序排列
     presets_list.sort(key=lambda x: x['sort_order'])
+    # 4返回响应，数据为排序后的预设信息列表
     return ApiResponse(data=presets_list)
 
+
+def generate_session_name():
+    """生成会话名称"""
+    #根据当前时间，命名为会话名称，格式为：YYYY-MM-DD_HH-MM-SS
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+
+@app.post("/api/sessions", summary="新建会话")
+async def create_session(request: CreateSessionRequest):
+    # 1.准备会话名称
+    session_name = generate_session_name()
+
+    return ApiResponse()
 
 
 if __name__ == '__main__':
