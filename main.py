@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-# ————————常量—————————————
+# --------常量--------
 PRESET_FILE_PATH = "data/companion_presets.json"
 
 # --------数据相关类--------
