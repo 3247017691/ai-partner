@@ -89,7 +89,7 @@ async def create_session(request: CreateSessionRequest):
         "session_name": session_name,
         "nick_name": request.nick_name,
         "nature": request.nature,
-        "message": []
+        "messages": []
     }
     # 3.将会话名称保存成json文件，文件名称是.json，转存为session目录里
     with open(get_session_path(session_name), 'w', encoding='utf-8') as f:
@@ -113,8 +113,9 @@ async def chat(request: ChatRequest) -> ApiResponse:
     system_prompt = SYSTEM_PROMPT_TEMPLATE % (request.nick_name, request.nature)
 
     # 3.构建消息列表
+    history = session_data.get("messages", [])
     messages = [{"role": "system", "content": system_prompt}]
-    for message in session_data["message"]:
+    for message in history:
         messages.append(message)
     messages.append({"role": "user", "content": request.message})
 
@@ -131,7 +132,7 @@ async def chat(request: ChatRequest) -> ApiResponse:
     # 6. 更新消息列表中的消息
     messages.pop(0)
     messages.append({"role": "assistant", "content": ai_response})
-    session_data["message"] = messages
+    session_data["messages"] = messages
     print(f"会话数据:{session_data}")
 
     # 7. 保存会话信息到json文件中
