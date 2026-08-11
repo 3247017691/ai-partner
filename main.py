@@ -124,18 +124,23 @@ async def chat(request: ChatRequest) -> ApiResponse:
         messages=messages,
         stream=False
     )
-    content = response.choices[0].message.content
-    session_data["message"].append({
-        "role": "assistant",
-        "content": content
-    })
+    # 5. 获取响应的数据
+    ai_response = response.choices[0].message.content
+    print(f"AI回复:{ai_response}")
 
-    # 5.将会话数据写回会话文件
+    # 6. 更新消息列表中的消息
+    messages.pop(0)
+    messages.append({"role": "assistant", "content": ai_response})
+    session_data["message"] = messages
+    print(f"会话数据:{session_data}")
+
+    # 7. 保存会话信息到json文件中
     with open(session_path, 'w', encoding='utf-8') as f:
         json.dump(session_data, f, ensure_ascii=False, indent=4)
 
-    # 6.返回响应，数据为AI的回复内容
-    return ApiResponse(data=content)
+    # 8.返回响应，数据为AI的回复内容
+    return ApiResponse(data=ai_response)
+
 
 if __name__ == '__main__':
     import uvicorn
