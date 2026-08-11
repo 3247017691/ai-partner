@@ -3,37 +3,14 @@ from typing import Any
 import os
 import json
 from openai import OpenAI
-
-
-
 from pydantic import BaseModel
+
 
 app = FastAPI()
 
 # --------常量--------
 PRESET_FILE_PATH = "data/companion_presets.json"
-
-# --------数据相关类--------
-class ApiResponse(BaseModel):
-    code: int = 200
-    message: str = "操作成功"
-    data: Any = None
-
-class CreateSessionRequest(BaseModel):
-    nick_name : str
-    nature : str
-
-
-# --------功能函数--------
-def generate_session_name():
-    """生成会话名称"""
-    from datetime import datetime
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
-# 保存为函数f"session/{session_name}.json"
-def get_session_path(session_name):
-    return f"session/{session_name}.json"
-
+SESSIONS_DIR = "sessions"
 # 系统提示词模板
 SYSTEM_PROMPT_TEMPLATE = """你叫 %s，现在是用户的真实伴侣，请完全代入伴侣角色。
     规则：
@@ -49,11 +26,36 @@ SYSTEM_PROMPT_TEMPLATE = """你叫 %s，现在是用户的真实伴侣，请完�
         - %s
     你必须严格遵守上述规则来回复用户。
     """
+# --------数据相关类--------
+class ApiResponse(BaseModel):
+    code: int = 200
+    message: str = "操作成功"
+    data: Any = None
+
+class CreateSessionRequest(BaseModel):
+    nick_name : str
+    nature : str
+
+class chat_request(BaseModel):
+
+
+# --------功能函数--------
+def generate_session_name():
+    """生成会话名称"""
+    from datetime import datetime
+    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+# 保存为函数f"sessions/{session_name}.json"
+def get_session_path(session_name):
+    return f"sessions/{session_name}.json"
+
+
 
 # 初始化OpenAI客户端
 client = OpenAI(api_key=os.environ.get('DEEPSEEK_API_KEY'),base_url="https://api.deepseek.com")
 
-
+if not os.path.exists(SESSIONS_DIR):
+    os.mkdir(SESSIONS_DIR)
 
 @app.get("/", summary="根路径")
 async def read_root():
