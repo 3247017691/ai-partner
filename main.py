@@ -169,6 +169,23 @@ async def session_find(session_name: str):
     # 3.返回响应，数据为会话数据
     return ApiResponse(data=session_data)
 
+
+@app.delete("/api/sessions/{session_name}", summary="删除指定会话", response_model=ApiResponse)
+def SessionDelete(session_name: str):
+    """删除指定会话"""
+    print(f"删除会话:{session_name}")
+    # 1.先获取会话路径
+    session_path = get_session_path(session_name)
+    # 2.验证会话文件是否存在
+    if not os.path.exists(session_path):
+        return ApiResponse(code=404, message="会话不存在")
+    # 3.删除会话文件
+    os.remove(session_path)
+    print(f"会话文件已删除:{session_path}")
+    # 4.返回响应，提示会话删除成功
+    return ApiResponse(message="会话删除成功")
+
+
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host='0.0.0.0', port=8000,)
