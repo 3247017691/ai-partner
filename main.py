@@ -4,7 +4,7 @@ import os
 import json
 from openai import OpenAI
 from pydantic import BaseModel
-
+import logging
 
 app = FastAPI()
 
@@ -64,10 +64,16 @@ if not os.path.exists(SESSIONS_DIR):
 async def read_root():
     return {"message": "Hello World"}
 
+# 配置日志
+logging.basicConfig(
+     level=logging.INFO,
+     format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
+)
 
 
 @app.get("/api/presets", summary='取得所有AI伴侣预设数据，前端用于渲染选择下拉框')
 async def presets():
+    logging.info("取得所有AI伴侣预设数据")
     # 1.如果预设的json文件不存在，就直接返回响应，相应信息“找不到预设信息”
     if not os.path.exists(PRESET_FILE_PATH):
         return {"error": "找不到预设信息"}
@@ -82,6 +88,7 @@ async def presets():
 
 @app.post("/api/sessions", summary="新建会话")
 async def create_session(request: CreateSessionRequest):
+    logging.info(f"新建会话: {request.nick_name}, {request.nature}")
     # 1.准备会话名称
     session_name = generate_session_name()
     # 2.封装会话数据
@@ -101,7 +108,7 @@ async def create_session(request: CreateSessionRequest):
 @app.post('/api/chat')
 async def chat(request: ChatRequest) -> ApiResponse:
     """AI伴侣聊天"""
-    print(f"与AI交互:{request.session_name} : {request.message}")
+    logging.info(f"与AI交互:{request.session_name} : {request.message}")
     # 1.从会话session_name.json文件中读取会话数据
     session_path = get_session_path(request.session_name)
     if not os.path.exists(session_path):
@@ -127,13 +134,13 @@ async def chat(request: ChatRequest) -> ApiResponse:
     )
     # 5. 获取响应的数据
     ai_response = response.choices[0].message.content
-    print(f"AI回复:{ai_response}")
+    logging.info(f"AI回复:{ai_response}")
 
     # 6. 更新消息列表中的消息
     messages.pop(0)
     messages.append({"role": "assistant", "content": ai_response})
     session_data["messages"] = messages
-    print(f"会话数据:{session_data}")
+    logging.info(f"会话数据:{session_data}")
 
     # 7. 保存会话信息到json文件中
     with open(session_path, 'w', encoding='utf-8') as f:
@@ -145,6 +152,7 @@ async def chat(request: ChatRequest) -> ApiResponse:
 
 @app.get("/api/sessions", summary="获取所有会话列表，按时间顺序降序排列（最新的会话排在最前）")
 async def sessions():
+    logging.info("获取所有会话列表")
     """获取所有会话列表，按时间顺序降序排列（最新的会话排在最前）"""
     sessions_list = []
     for filename in os.listdir(SESSIONS_DIR):
@@ -158,7 +166,7 @@ async def sessions():
 @app.get("/api/sessions/{session_name}", summary="获取指定会话数据", response_model=ApiResponse)
 async def session_find(session_name: str):
     """获取指定会话数据"""
-    print(f"获取会话数据:{session_name}")
+    logging.info(f"获取指定会话数据: {session_name}")
     session_path = get_session_path(session_name)
     # 1.验证会话文件是否存在
     if not os.path.exists(session_path):
@@ -173,7 +181,7 @@ async def session_find(session_name: str):
 @app.delete("/api/sessions/{session_name}", summary="删除指定会话", response_model=ApiResponse)
 def session_delete(session_name: str):
     """删除指定会话"""
-    print(f"删除会话:{session_name}")
+    logging.info(f"删除指定会话: {session_name}")
     # 1.先获取会话路径
     session_path = get_session_path(session_name)
     # 2.验证会话文件是否存在
@@ -181,7 +189,7 @@ def session_delete(session_name: str):
         return ApiResponse(code=404, message="会话不存在")
     # 3.删除会话文件
     os.remove(session_path)
-    print(f"会话文件已删除:{session_path}")
+    logging.info(f"会话文件已删除: {session_path}")
     # 4.返回响应，提示会话删除成功
     return ApiResponse(message="会话删除成功")
 
