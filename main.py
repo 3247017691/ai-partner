@@ -171,7 +171,7 @@ async def session_find(session_name: str):
 
 
 @app.delete("/api/sessions/{session_name}", summary="删除指定会话", response_model=ApiResponse)
-def SessionDelete(session_name: str):
+def session_delete(session_name: str):
     """删除指定会话"""
     print(f"删除会话:{session_name}")
     # 1.先获取会话路径
