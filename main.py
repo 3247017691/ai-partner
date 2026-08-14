@@ -1,10 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from typing import Any
 import os
 import json
 from openai import OpenAI
 from pydantic import BaseModel
 import logging
+
+from starlette.responses import JSONResponse
 
 app = FastAPI()
 
@@ -52,6 +54,11 @@ def generate_session_name():
 def get_session_path(session_name):
     return f"{SESSIONS_DIR}/{session_name}.json"
 
+@app.exception_handler(Exception)
+def handle_exception(request: Request, exc: Exception):
+    logging.error(f"处理异常, 请求路径: {request.url}, 异常信息: {exc}")
+    return JSONResponse(content={"code": 500, "message": "服务器内部错误"})
+
 
 
 # 初始化OpenAI客户端
@@ -71,21 +78,6 @@ logging.basicConfig(
 )
 
 
-@app.get("/api/presets", summary='取得所有AI伴侣预设数据，前端用于渲染选择下拉框')
-async def presets():
-    logging.info("取得所有AI伴侣预设数据")
-    # 1.如果预设的json文件不存在，就直接返回响应，相应信息“找不到预设信息”
-    if not os.path.exists(PRESET_FILE_PATH):
-        return {"error": "找不到预设信息"}
-    # 2.如果预设的json文件存在，就读取文件内容并返回
-    with open(PRESET_FILE_PATH, 'r', encoding='utf-8') as f:
-        presets_list = json.load(f)
-    # 3然后按每个预设信息的sort_order进行排序排列
-    presets_list.sort(key=lambda x: x['sort_order'])
-    # 4返回响应，数据为排序后的预设信息列表
-    return ApiResponse(data=presets_list)
-
-
 @app.post("/api/sessions", summary="新建会话")
 async def create_session(request: CreateSessionRequest):
     logging.info(f"新建会话: {request.nick_name}, {request.nature}")
@@ -103,6 +95,7 @@ async def create_session(request: CreateSessionRequest):
         json.dump(session_data, f, ensure_ascii=False, indent=4)
     # 4返回响应，数据为会话名称
     return ApiResponse(data=session_name)
+
 
 
 @app.post('/api/chat')
@@ -196,4 +189,4 @@ def session_delete(session_name: str):
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8000,)
+    uvicorn.run(app, host='0.0.0.0', port=8000, access_log=False)
