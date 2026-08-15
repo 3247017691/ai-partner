@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import select
 from fastapi import FastAPI, Request, Depends
 from fastapi.encoders import jsonable_encoder
@@ -8,6 +9,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 import logging
 
+from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import AiPreset, get_db_session, AiSession, AiMessage
 from starlette.responses import JSONResponse
@@ -170,7 +172,7 @@ async def load_presets(db_session:AsyncSession = Depends(get_db_session)) -> Api
 
 
 @app.post("/api/sessions", summary="新建会话")
-async def create_session(request: CreateSessionRequest):
+async def create_session(request: CreateSessionRequest, db_session:AsyncSession = Depends(get_db_session)):
     """
     创建新的聊天会话。
 
@@ -184,17 +186,15 @@ async def create_session(request: CreateSessionRequest):
     logging.info(f"新建会话: {request.nick_name}, {request.nature}")
     # 1.准备会话名称
     session_name = generate_session_name()
-    # 2.封装会话数据
-    session_data = {
-        "session_name": session_name,
-        "nick_name": request.nick_name,
-        "nature": request.nature,
-        "messages": []
-    }
-    # 3.将会话名称保存成json文件，文件名称是.json，转存为session目录里
-    with open(get_session_path(session_name), 'w', encoding='utf-8') as f:
-        json.dump(session_data, f, ensure_ascii=False, indent=4)
-    # 4返回响应，数据为会话名称
+
+    # 2.将会话名称保存成SQL数据库
+    now = datetime.now()
+    await db_session.execute(insert(AiSession),
+                             {"session_name": session_name, "nick_name": request.nick_name,
+                              "nature": request.nature, "create_time": now, "update_time": now})
+    await db_session.commit()
+
+    # 3返回响应，数据为会话名称
     return ApiResponse(data=session_name)
 
 
