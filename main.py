@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from fastapi import FastAPI, Request, Depends
 from fastapi.encoders import jsonable_encoder
 from typing import Any
@@ -306,7 +306,7 @@ async def session_find(session_name: str, db_session:AsyncSession = Depends(get_
 
 
 @app.delete("/api/sessions/{session_name}", summary="删除指定会话", response_model=ApiResponse)
-def session_delete(session_name: str):
+async def session_delete(session_name: str, db_session:AsyncSession = Depends(get_db_session)):
     """
     根据会话名称删除已存在的会话。
 
@@ -317,18 +317,22 @@ def session_delete(session_name: str):
     :return: 表示删除结果的 ApiResponse 对象。
     """
     logging.info(f"删除指定会话: {session_name}")
-    # 1.先获取会话路径
-    session_path = get_session_path(session_name)
-    # 2.验证会话文件是否存在
-    if not os.path.exists(session_path):
-        return ApiResponse(code=404, message="会话不存在")
-    # 3.删除会话文件
-    os.remove(session_path)
-    logging.info(f"会话文件已删除: {session_path}")
+    # 1.先获取会话ID
+    result = await db_session.execute(select(AiSession).where(AiSession.session_name == session_name))
+    session_data = result.scalars().first()
+
+    # 2.先删除会话信息
+    await db_session.execute(delete(AiMessage).where(AiMessage.session_id == session_data.id))
+
+    # 3.再删除会话数据
+    await db_session.execute(delete(AiSession).where(AiSession.id == session_data.id))
+
     # 4.返回响应，提示会话删除成功
+    await db_session.commit()
     return ApiResponse(message="会话删除成功")
 
 
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host='0.0.0.0', port=8000, access_log=False)
+
