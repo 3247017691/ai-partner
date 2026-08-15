@@ -3,7 +3,10 @@ name = "ai-partner"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
+    "aiomysql>=0.3.2",
+    "cryptography>=50.0.0",
     "fastapi>=0.141.1",
     "openai>=2.53.0",
+    "sqlalchemy>=2.0.52",
     "uvicorn>=0.52.1",
 ]
