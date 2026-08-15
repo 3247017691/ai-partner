@@ -115,3 +115,14 @@ class AiMessage(Base):
 
 # 3. 会话工厂(支持异步操作)
 session_factory = async_sessionmaker(engine)
+
+
+async def get_db_session():
+    db_session = session_factory()
+    try:
+        yield db_session
+    except:
+        await db_session.rollback()
+        raise
+    finally:
+        await db_session.close()
