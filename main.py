@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from db import AiPreset, get_db_session, AiSession
+from db import AiPreset, get_db_session, AiSession, AiMessage
 from starlette.responses import JSONResponse
 
 app = FastAPI()
@@ -256,7 +256,7 @@ async def chat(request: ChatRequest) -> ApiResponse:
 
 
 @app.get("/api/sessions", summary="获取所有会话列表，按时间顺序降序排列（最新的会话排在最前）")
-async def sessions(db_session:AsyncSession = Depends(get_db_session())):
+async def sessions(db_session:AsyncSession = Depends(get_db_session)):
     """
     获取所有会话列表，按时间顺序降序排列（最新的会话排在最前）。
 
@@ -275,26 +275,33 @@ async def sessions(db_session:AsyncSession = Depends(get_db_session())):
     return ApiResponse(data=one)
 
 @app.get("/api/sessions/{session_name}", summary="获取指定会话数据", response_model=ApiResponse)
-async def session_find(session_name: str):
+async def session_find(session_name: str, db_session:AsyncSession = Depends(get_db_session)):
     """
-    根据会话名称从文件系统中获取会话数据。
+    根据会话名称从数据库中获取会话数据。
 
-    先检查会话文件是否存在。若存在，读取文件并解析为 JSON，
-    以会话数据作为负载返回成功响应；若文件不存在，
+    先查询会话是否存在。若存在，返回会话基本信息及该会话下的
+    全部聊天消息（按创建时间升序）；若不存在，
     返回状态码为 404 和错误信息的响应。
 
     :param session_name: 需要获取的会话名称。
-    :return: 成功时包含会话数据的 ApiResponse；会话文件不存在时返回状态码 404 的错误响应。
+    :return: 成功时包含会话数据（含消息列表）的 ApiResponse；会话不存在时返回状态码 404 的错误响应。
     """
     logging.info(f"获取指定会话数据: {session_name}")
-    session_path = get_session_path(session_name)
-    # 1.验证会话文件是否存在
-    if not os.path.exists(session_path):
+    # 1.执行查询操作->查询ai_session表中session_name列等于session_name的记录
+    result = await db_session.execute(select(AiSession).where(AiSession.session_name == session_name))
+    session_data = result.scalars().first()
+    # 2.验证会话数据是否存在
+    if session_data is None:
         return ApiResponse(code=404, message="会话不存在")
-    # 2.读取会话文件内容
-    with open(session_path, 'r', encoding='utf-8') as f:
-        session_data = json.load(f)
-    # 3.返回响应，数据为会话数据
+    # 3.查询该会话下的所有聊天消息，按创建时间升序
+    messages_result = await db_session.execute(
+        select(AiMessage).where(AiMessage.session_id == session_data.id).order_by(AiMessage.create_time.asc())
+    )
+    messages_list = messages_result.scalars().all()
+    # 4.封装会话数据（jsonable_encoder 将 ORM 对象转为可 JSON 序列化的字典，datetime 字段一并处理）
+    session_data = jsonable_encoder(session_data)
+    session_data["messages"] = jsonable_encoder(messages_list)
+    # 5.返回响应，数据为会话数据（含消息列表）
     return ApiResponse(data=session_data)
 
 
