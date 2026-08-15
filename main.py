@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from db import AiPreset, session_factory, get_db_session
+from db import AiPreset, get_db_session, AiSession
 from starlette.responses import JSONResponse
 
 app = FastAPI()
@@ -256,7 +256,7 @@ async def chat(request: ChatRequest) -> ApiResponse:
 
 
 @app.get("/api/sessions", summary="获取所有会话列表，按时间顺序降序排列（最新的会话排在最前）")
-async def sessions():
+async def sessions(db_session:AsyncSession = Depends(get_db_session())):
     """
     获取所有会话列表，按时间顺序降序排列（最新的会话排在最前）。
 
@@ -267,15 +267,12 @@ async def sessions():
     :rtype: ApiResponse
     """
     logging.info("获取所有会话列表")
-    """获取所有会话列表，按时间顺序降序排列（最新的会话排在最前）"""
-    sessions_list = []
-    for filename in os.listdir(SESSIONS_DIR):
-        if filename.endswith(".json"):
-            session_name = filename[:-5]  # 去掉.json后缀
-            sessions_list.append(session_name)
-    sessions_list.sort(reverse=True)
-    return ApiResponse(data=sessions_list)
 
+    # 执行SQL得到结果
+    result = await db_session.execute(select(AiSession.session_name).order_by(AiSession.session_name.desc()))
+    one = result.scalars().all()
+    # 返回响应结果
+    return ApiResponse(data=one)
 
 @app.get("/api/sessions/{session_name}", summary="获取指定会话数据", response_model=ApiResponse)
 async def session_find(session_name: str):
