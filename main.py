@@ -1,8 +1,9 @@
 from datetime import datetime
-from sqlalchemy import Integer, String, DateTime
+from sqlalchemy import Integer, String, DateTime, select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from typing import Any
 import os
 import json
@@ -139,6 +140,22 @@ logging.basicConfig(
 )
 
 
+
+@app.get('/api/presets', summary='伴侣预设信息预览')
+async def load_presets() -> ApiResponse:
+    logging.info("获取伴侣预设信息列表")
+    # 获取session（使用async with自动释放资源）
+    session = session_factory()
+
+    # 执行查询操作->查询ai_preset表中所有数据，根据sort_order排序升序
+    result = await session.execute(select(AiPreset).order_by(AiPreset.sort_order.asc()))
+    presets_list = jsonable_encoder(result.scalars().all())
+
+    # 释放资源
+    await session.close()
+    return ApiResponse(data=presets_list)
+
+
 @app.post("/api/sessions", summary="新建会话")
 async def create_session(request: CreateSessionRequest):
     logging.info(f"新建会话: {request.nick_name}, {request.nature}")
@@ -159,7 +176,7 @@ async def create_session(request: CreateSessionRequest):
 
 
 
-@app.post('/api/chat')
+@app.post('/api/chat', summary="AI伴侣聊天")
 async def chat(request: ChatRequest) -> ApiResponse:
     """AI伴侣聊天"""
     logging.info(f"与AI交互:{request.session_name} : {request.message}")
