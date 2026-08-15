@@ -1,7 +1,4 @@
-from datetime import datetime
-from sqlalchemy import Integer, String, DateTime, select
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
+from sqlalchemy import select
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from typing import Any
@@ -11,6 +8,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 import logging
 
+from db import AiPreset, session_factory
 from starlette.responses import JSONResponse
 
 app = FastAPI()
@@ -36,16 +34,15 @@ SYSTEM_PROMPT_TEMPLATE = """你叫 %s，现在是用户的真实伴侣，请完�
 # --------数据相关类--------
 class ApiResponse(BaseModel):
     """
-    Generic API response model.
+    通用 API 响应模型。
 
-    This class provides a standardized structure for API responses. It includes
-    a status code, a message, and an optional data payload. The model inherits
-    from Pydantic's BaseModel, enabling validation and serialization of the
-    response data.
+    该类为 API 响应提供统一的结构，包含状态码、提示信息
+    和可选的数据负载。模型继承自 Pydantic 的 BaseModel，
+    支持对响应数据进行校验和序列化。
 
-    :ivar code: Status code indicating the result of the operation.
-    :ivar message: Human-readable message describing the operation result.
-    :ivar data: Data payload returned by the API, which can be of any type.
+    :ivar code: 表示操作结果的状态码。
+    :ivar message: 描述操作结果的可读提示信息。
+    :ivar data: API 返回的数据负载，可以是任意类型。
     """
     code: int = 200
     message: str = "操作成功"
@@ -53,30 +50,29 @@ class ApiResponse(BaseModel):
 
 class CreateSessionRequest(BaseModel):
     """
-    Represents a request payload for creating a session.
+    表示创建会话的请求负载。
 
-    This Pydantic model validates and structures the input data required to
-    create a new session. It inherits from ``pydantic.BaseModel``, ensuring
-    that the fields are parsed and validated according to their type hints.
+    该 Pydantic 模型用于校验和构造创建新会话所需的输入数据，
+    继承自 ``pydantic.BaseModel``，确保字段按照类型标注
+    进行解析和校验。
 
-    :ivar nick_name: The nickname to associate with the created session.
-    :ivar nature: The nature or category of the session.
+    :ivar nick_name: 与创建的会话关联的伴侣昵称。
+    :ivar nature: 会话的性格或类型描述。
     """
     nick_name : str
     nature : str
 
 class ChatRequest(BaseModel):
     """
-    Summary of the ChatRequest model.
+    表示聊天请求负载的 Pydantic 模型。
 
-    ChatRequest is a Pydantic model representing a chat request payload,
-    containing session-related information, the message content, a user's
-    nickname, and an additional nature or context descriptor.
+    包含会话相关信息、消息内容、用户昵称
+    以及额外的性格或上下文描述。
 
-    :ivar session_name: Name or identifier of the chat session.
-    :ivar message: The text message sent in the chat request.
-    :ivar nick_name: Nickname of the user sending the request.
-    :ivar nature: Additional nature or category associated with the request.
+    :ivar session_name: 聊天会话的名称或标识。
+    :ivar message: 聊天请求中发送的文本消息。
+    :ivar nick_name: 发送请求的用户昵称。
+    :ivar nature: 与请求关联的性格或类型描述。
     """
     session_name: str
     message: str
@@ -86,13 +82,12 @@ class ChatRequest(BaseModel):
 # --------功能函数--------
 def generate_session_name():
     """
-    Generate a session name based on the current date and time.
+    根据当前日期和时间生成会话名称。
 
-    The session name is created by formatting the current local date and
-    time as ``YYYY-MM-DD_HH-MM-SS``.
+    会话名称通过将当前本地日期时间格式化为
+    ``YYYY-MM-DD_HH-MM-SS`` 生成。
 
-    :return: The generated session name as a string in the format
-        ``YYYY-MM-DD_HH-MM-SS``.
+    :return: 生成的会话名称字符串，格式为 ``YYYY-MM-DD_HH-MM-SS``。
     """
     from datetime import datetime
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -100,14 +95,14 @@ def generate_session_name():
 # 保存为函数f"sessions/{session_name}.json"
 def get_session_path(session_name):
     """
-    Constructs a file path for a session's JSON file.
+    构造会话 JSON 文件的存储路径。
 
-    The path is built by joining the global ``SESSIONS_DIR`` directory with
-    the provided session name and appending the ``.json`` file extension.
+    路径由全局 ``SESSIONS_DIR`` 目录与会话名称拼接而成，
+    并追加 ``.json`` 文件扩展名。
 
-    :param session_name: The name of the session for which to generate the path.
+    :param session_name: 需要生成路径的会话名称。
     :type session_name: str
-    :return: The full file path to the session's JSON file.
+    :return: 会话 JSON 文件的完整路径。
     :rtype: str
     """
     return f"{SESSIONS_DIR}/{session_name}.json"
@@ -126,116 +121,6 @@ def handle_exception(request: Request, exc: Exception):
     logging.error(f"处理异常, 请求路径: {request.url}, 异常信息: {exc}")
     return JSONResponse(content={"code": 500, "message": "服务器内部错误"})
 
-
-# --------数据库相关--------
-# 1. 创建引擎(支持异步操作)
-engine = create_async_engine("mysql+aiomysql://root:1234@localhost:3306/ai_partner_db", echo=True)
-
-# 2. 声明模型类
-class Base(DeclarativeBase):
-    """
-    Base class for declarative models.
-
-    This class inherits from DeclarativeBase and serves as the base class
-    for all ORM models. Subclass this class to define mapped classes that
-    represent database tables.
-    """
-    pass
-
-class AiPreset(Base):
-    """
-    Represents an AI preset configuration stored in the database.
-
-    The AiPreset class is a SQLAlchemy model that maps to the ``ai_preset`` table.
-    It holds information about presets used to define AI companion behavior, such as
-    names, personality descriptions, and ordering.
-
-    :ivar id: Unique identifier for the preset.
-    :ivar name: Name of the preset.
-    :ivar nick_name: Nickname assigned to the companion.
-    :ivar nature: Description of the companion's personality.
-    :ivar sort_order: Position used for ordering presets.
-    :ivar create_time: Timestamp indicating when the preset was created.
-    """
-    __tablename__ = "ai_preset"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="主键")
-    name: Mapped[str] = mapped_column(String(50), nullable=False, comment="预设名称")
-    nick_name: Mapped[str] = mapped_column(String(50), nullable=False, comment="伴侣昵称")
-    nature: Mapped[str] = mapped_column(String(500), nullable=False, comment="伴侣性格描述")
-    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, comment="排序顺序")
-    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, comment="创建时间")
-
-    def __repr__(self):
-        return f"AiPreset(id={self.id}, name={self.name}, nick_name={self.nick_name}, nature={self.nature}, sort_order={self.sort_order}, create_time={self.create_time})"
-
-
-class AiSession(Base):
-    """
-    SQLAlchemy model representing an AI session.
-
-    Represents a record in the ``ai_session`` table, storing configuration and
-    metadata for an AI conversational session, including its unique name, the
-    partner's nickname and personality description, and timestamps for creation
-    and last update.
-
-    :ivar id: Primary key, auto-incrementing integer.
-    :type id: int
-    :ivar session_name: Unique name of the session.
-    :type session_name: str
-    :ivar nick_name: Nickname of the AI partner.
-    :type nick_name: str
-    :ivar nature: Personality description of the AI partner.
-    :type nature: str
-    :ivar create_time: Timestamp when the record was created.
-    :type create_time: datetime
-    :ivar update_time: Timestamp when the record was last updated.
-    :type update_time: datetime
-    """
-    __tablename__ = "ai_session"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="主键")
-    session_name: Mapped[str]= mapped_column(String(50), unique=True, nullable=False, comment="会话名称")
-    nick_name: Mapped[str] = mapped_column(String(50), nullable=False, default="小甜甜", comment="伴侣昵称")
-    nature: Mapped[str] = mapped_column(String(500), nullable=False, default="活泼开朗的东北姑娘", comment="伴侣性格")
-    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, comment="创建时间")
-    update_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, comment="更新时间")
-
-    def __repr__(self):
-        return f"AiSession(id={self.id}, session_id={self.session_name}, nick_name={self.nick_name}, nature={self.nature}, create_time={self.create_time}, update_time={self.update_time})"
-
-
-class AiMessage(Base):
-    """
-    SQLAlchemy model representing an AI chat message.
-
-    Maps to the ``ai_message`` table and stores individual messages exchanged
-    between users and the AI assistant within a chat session.
-
-    :ivar id: Primary key.
-    :type id: int
-    :ivar session_id: Identifier of the chat session to which the message belongs.
-    :type session_id: int
-    :ivar role: Role of the message sender, either ``user`` or ``assistant``.
-    :type role: str
-    :ivar content: Text content of the message.
-    :type content: str
-    :ivar create_time: Timestamp when the message was created.
-    :type create_time: datetime
-    """
-    __tablename__ = "ai_message"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="主键")
-    session_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="会话ID")
-    role: Mapped[str] = mapped_column(String(20), nullable=False, comment="消息角色：user-用户，assistant-AI")
-    content: Mapped[str] = mapped_column(String(500), nullable=False, comment="消息内容")
-    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, comment="创建时间")
-
-    def __repr__(self):
-        return f"AiMessage(id={self.id}, session_id={self.session_id}, role={self.role}, content={self.content}, create_time={self.create_time})"
-
-# 3. 会话工厂(支持异步操作)
-session_factory = async_sessionmaker(engine)
 
 
 # 初始化OpenAI客户端
@@ -265,13 +150,13 @@ logging.basicConfig(
 @app.get('/api/presets', summary='伴侣预设信息预览')
 async def load_presets() -> ApiResponse:
     """
-    Retrieve all AI presets from the database, ordered by sort order in ascending order.
+    从数据库中获取所有 AI 伴侣预设，按排序顺序升序排列。
 
-    This function queries the AI preset table, retrieves all records ordered by
-    the sort_order field, converts them to a JSON-compatible format, and closes
-    the database session. The resulting list is then wrapped in an API response.
+    该函数查询 AI 预设表，按 sort_order 字段升序获取所有记录，
+    将其转换为可 JSON 序列化的格式后关闭数据库会话，
+    最终将结果列表封装为统一 API 响应返回。
 
-    :return: Response containing the list of AI preset information.
+    :return: 包含 AI 预设信息列表的响应对象。
     """
     logging.info("获取伴侣预设信息列表")
     # 获取session（使用async with自动释放资源）
@@ -289,15 +174,14 @@ async def load_presets() -> ApiResponse:
 @app.post("/api/sessions", summary="新建会话")
 async def create_session(request: CreateSessionRequest):
     """
-    Create a new chat session.
+    创建新的聊天会话。
 
-    Generates a unique session name and saves an initial session JSON file to the sessions
-    directory.
+    生成唯一的会话名称，并将初始会话数据保存为 JSON 文件到 sessions 目录。
 
-    :param request: The request body containing the nick name and nature for the session.
-    :return: An ApiResponse containing the generated session name.
+    :param request: 包含伴侣昵称和性格描述的请求体。
+    :return: 包含生成会话名称的 ApiResponse 对象。
     :rtype: ApiResponse
-    :raises OSError: If the session file cannot be created or written.
+    :raises OSError: 会话文件无法创建或写入时抛出。
     """
     logging.info(f"新建会话: {request.nick_name}, {request.nature}")
     # 1.准备会话名称
@@ -320,19 +204,16 @@ async def create_session(request: CreateSessionRequest):
 @app.post('/api/chat', summary="AI伴侣聊天")
 async def chat(request: ChatRequest) -> ApiResponse:
     """
-    Handle AI companion chat requests.
+    处理 AI 伴侣聊天请求。
 
-    Loads session data from a JSON file for the given session name. If the session
-    does not exist, returns a response with code 404. Otherwise, constructs a
-    system prompt using the user's nick name and nature, appends the chat history
-    and the new user message, sends them to the Deepseek API, updates the session
-    with the assistant's reply, saves it back to the file, and returns the AI
-    response in a standard API response object.
+    根据会话名称从 JSON 文件中加载会话数据。若会话不存在，
+    返回状态码为 404 的响应；否则使用用户昵称和性格拼接系统提示词，
+    追加历史消息与新的用户消息后调用 Deepseek API，
+    将 AI 回复更新回会话并保存至文件，
+    最后以统一响应格式返回 AI 回复。
 
-    :param request: The chat request containing the session name, user message,
-        nick name, and nature.
-    :return: A response object containing the AI's reply on success, or a response
-        with code 404 if the session file does not exist.
+    :param request: 包含会话名称、用户消息、昵称和性格的聊天请求。
+    :return: 成功时包含 AI 回复的响应对象；会话文件不存在时返回状态码 404 的响应。
     """
     logging.info(f"与AI交互:{request.session_name} : {request.message}")
     # 1.从会话session_name.json文件中读取会话数据
@@ -401,16 +282,14 @@ async def sessions():
 @app.get("/api/sessions/{session_name}", summary="获取指定会话数据", response_model=ApiResponse)
 async def session_find(session_name: str):
     """
-    Retrieves session data for a given session name from the filesystem.
+    根据会话名称从文件系统中获取会话数据。
 
-    Checks whether the session file exists. If it does, reads the file as JSON
-    and returns a successful ApiResponse with the session data as payload. If the
-    file does not exist, returns an ApiResponse with a 404 status code and an
-    error message.
+    先检查会话文件是否存在。若存在，读取文件并解析为 JSON，
+    以会话数据作为负载返回成功响应；若文件不存在，
+    返回状态码为 404 和错误信息的响应。
 
-    :param session_name: Name of the session to retrieve.
-    :return: ApiResponse containing the session data on success, or an error
-        response with status code 404 if the session file is missing.
+    :param session_name: 需要获取的会话名称。
+    :return: 成功时包含会话数据的 ApiResponse；会话文件不存在时返回状态码 404 的错误响应。
     """
     logging.info(f"获取指定会话数据: {session_name}")
     session_path = get_session_path(session_name)
@@ -427,13 +306,13 @@ async def session_find(session_name: str):
 @app.delete("/api/sessions/{session_name}", summary="删除指定会话", response_model=ApiResponse)
 def session_delete(session_name: str):
     """
-    Delete an existing session by its name.
+    根据会话名称删除已存在的会话。
 
-    Checks whether the session file exists, removes it, and returns a success
-    response. If the session does not exist, a 404 response is returned.
+    先检查会话文件是否存在，若存在则删除并返回成功响应；
+    若会话不存在，返回 404 响应。
 
-    :param session_name: Name of the session to delete.
-    :return: ApiResponse indicating deletion result.
+    :param session_name: 需要删除的会话名称。
+    :return: 表示删除结果的 ApiResponse 对象。
     """
     logging.info(f"删除指定会话: {session_name}")
     # 1.先获取会话路径
