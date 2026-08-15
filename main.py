@@ -1,5 +1,5 @@
 from sqlalchemy import select
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.encoders import jsonable_encoder
 from typing import Any
 import os
@@ -8,7 +8,8 @@ from openai import OpenAI
 from pydantic import BaseModel
 import logging
 
-from db import AiPreset, session_factory
+from sqlalchemy.ext.asyncio import AsyncSession
+from db import AiPreset, session_factory, get_db_session
 from starlette.responses import JSONResponse
 
 app = FastAPI()
@@ -148,7 +149,7 @@ logging.basicConfig(
 
 
 @app.get('/api/presets', summary='伴侣预设信息预览')
-async def load_presets() -> ApiResponse:
+async def load_presets(db_session:AsyncSession = Depends(get_db_session)) -> ApiResponse:
     """
     从数据库中获取所有 AI 伴侣预设，按排序顺序升序排列。
 
@@ -159,15 +160,12 @@ async def load_presets() -> ApiResponse:
     :return: 包含 AI 预设信息列表的响应对象。
     """
     logging.info("获取伴侣预设信息列表")
-    # 获取session（使用async with自动释放资源）
-    session = session_factory()
 
-    # 执行查询操作->查询ai_preset表中所有数据，根据sort_order排序升序
-    result = await session.execute(select(AiPreset).order_by(AiPreset.sort_order.asc()))
+    # 1.执行查询操作->查询ai_preset表中所有数据，根据sort_order排序升序
+    result = await db_session.execute(select(AiPreset).order_by(AiPreset.sort_order.asc()))
+    # 2.处理查询结果:jsonable_encoder(参数) 帮我们把参数转换为可JSON序列化的格式
     presets_list = jsonable_encoder(result.scalars().all())
 
-    # 释放资源
-    await session.close()
     return ApiResponse(data=presets_list)
 
 
