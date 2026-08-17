@@ -299,8 +299,15 @@ async def session_find(session_name: str, db_session:AsyncSession = Depends(get_
     )
     messages_list = messages_result.scalars().all()
     # 4.封装会话数据（jsonable_encoder 将 ORM 对象转为可 JSON 序列化的字典，datetime 字段一并处理）
-    session_data = jsonable_encoder(session_data)
-    session_data["messages"] = jsonable_encoder(messages_list)
+    messages_data = jsonable_encoder(session_data)
+    messages_data["messages"] = jsonable_encoder(messages_list)
+    # 5.组装返回结果
+    session_data = {
+        "session_name": session_data["session_name"],
+        "nick_name": session_data["nick_name"],
+        "nature": session_data["nature"],
+        "messages": messages_data["messages"]
+    }
     # 5.返回响应，数据为会话数据（含消息列表）
     return ApiResponse(data=session_data)
 
