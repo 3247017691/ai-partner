@@ -12,11 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 from starlette.requests import Request
 
-from db import AiPreset, get_db_session, AiSession, AiMessage
+from app.db import AiPreset, get_db_session, AiSession, AiMessage
 
 app = FastAPI()
 
-client = OpenAI(api_key=os.environ.get('AI_DEEPSEEK_API_KEY'), base_url="https://api.deepseek.com")
+client = OpenAI(api_key=os.environ.get('DEEPSEEK_API_KEY'), base_url="https://api.deepseek.com")
 
 # -----------全局设置-----------
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s")
