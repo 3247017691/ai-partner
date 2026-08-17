@@ -10,13 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 from starlette.requests import Request
 
+from ai import SYSTEM_PROMPT_TEMPLATE, client
 from app.db import AiPreset, get_db_session, AiSession, AiMessage
 from schemas import ApiResponse, CreateSessionRequest, ChatRequest
 from utils import generate_session_name
 
 app = FastAPI()
 
-client = OpenAI(api_key=os.environ.get('DEEPSEEK_API_KEY'), base_url="https://api.deepseek.com")
 
 # -----------全局设置-----------
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s")
@@ -27,27 +27,6 @@ logging.getLogger("sqlalchemy.engine").propagate = False
 def handle_exception(request: Request, e: Exception):
     logging.error(f"Exception on {request.method} {request.url}: {e}")
     return JSONResponse(content={"code": 500, "message": "系统正在维护,请重试或联系管理员"})
-
-
-# ------------常量-------------
-# 系统提示词模板
-SYSTEM_PROMPT_TEMPLATE = """你叫 %s，现在是用户的真实伴侣，请完全代入伴侣角色。
-    规则：
-        1. 每次只回1条消息
-        2. 禁止任何场景或状态描述性文字
-        3. 匹配用户的语言
-        4. 回复简短，像微信聊天一样
-        5. 有需要的话可以用❤️🌸等emoji表情
-        6. 用符合伴侣性格的方式对话
-        7. 回复的内容, 要充分体现伴侣的性格特征
-        8. 不要太肉麻（比如想你之类的，就日常聊天）
-    伴侣性格：
-        - %s
-    你必须严格遵守上述规则来回复用户。
-    """
-
-
-
 
 
 
