@@ -27,17 +27,23 @@
 
 ```
 ai-partner/
-├── main.py                 # FastAPI 入口：路由、聊天逻辑、系统提示词
+├── main.py                 # FastAPI 入口：路由、聊天业务逻辑
 ├── pyproject.toml          # 项目配置与依赖声明（uv）
 ├── uv.lock                 # 依赖锁文件
 ├── test_main.http          # HTTP 接口测试文件（IDEA 可直接运行）
 └── app/
+    ├── ai/                 # AI 配置层
+    │   ├── config.py       # DeepSeek 客户端与系统提示词模板
+    │   └── __init__.py
     ├── db/                 # 数据库层
     │   ├── database.py     # 异步引擎 / 会话工厂（连接串在此配置）
     │   ├── models.py       # ORM 模型：AiPreset / AiSession / AiMessage
     │   └── __init__.py
-    └── schemas/            # 数据模型层
-        ├── schemas.py      # Pydantic 请求/响应模型
+    ├── schemas/            # 数据模型层
+    │   ├── schemas.py      # Pydantic 请求/响应模型
+    │   └── __init__.py
+    └── utils/              # 工具函数层
+        ├── utils.py        # 会话名称生成等通用工具
         └── __init__.py
 ```
 
@@ -175,7 +181,7 @@ curl -X POST http://127.0.0.1:8000/api/chat \
 
 ## 系统提示词说明
 
-服务内置了伴侣角色扮演的系统提示词模板（见 `main.py` 中 `SYSTEM_PROMPT_TEMPLATE`），核心规则包括：
+服务内置了伴侣角色扮演的系统提示词模板（见 `app/ai/config.py` 中 `SYSTEM_PROMPT_TEMPLATE`），核心规则包括：
 
 - 完全代入伴侣角色，每次只回 1 条消息
 - 回复简短，像微信聊天一样，可适当使用 emoji

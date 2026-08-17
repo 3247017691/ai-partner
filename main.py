@@ -10,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 from starlette.requests import Request
 
-from ai import SYSTEM_PROMPT_TEMPLATE, client
+from app.ai import SYSTEM_PROMPT_TEMPLATE, client
 from app.db import AiPreset, get_db_session, AiSession, AiMessage
-from schemas import ApiResponse, CreateSessionRequest, ChatRequest
-from utils import generate_session_name
+from app.schemas import ApiResponse, CreateSessionRequest, ChatRequest
+from app.utils import generate_session_name
 
 app = FastAPI()
 

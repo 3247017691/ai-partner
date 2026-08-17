@@ -1,4 +1,4 @@
-from ai.config import client, SYSTEM_PROMPT_TEMPLATE
+from app.ai.config import client, SYSTEM_PROMPT_TEMPLATE
 
 __all__ = [
     "client",
