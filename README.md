@@ -27,7 +27,7 @@
 
 ```
 ai-partner/
-├── main.py                 # FastAPI 入口：路由、聊天业务逻辑
+├── main.py                 # FastAPI 应用入口：装配路由、全局异常处理
 ├── pyproject.toml          # 项目配置与依赖声明（uv）
 ├── uv.lock                 # 依赖锁文件
 ├── test_main.http          # HTTP 接口测试文件（IDEA 可直接运行）
@@ -38,6 +38,11 @@ ai-partner/
     ├── db/                 # 数据库层
     │   ├── database.py     # 异步引擎 / 会话工厂（连接串在此配置）
     │   ├── models.py       # ORM 模型：AiPreset / AiSession / AiMessage
+    │   └── __init__.py
+    ├── routers/            # API 路由层（按业务拆分）
+    │   ├── chat.py         # /api/chat 聊天接口
+    │   ├── presets.py      # /api/presets 预设接口
+    │   ├── sessions.py     # /api/sessions 会话管理接口
     │   └── __init__.py
     ├── schemas/            # 数据模型层
     │   ├── schemas.py      # Pydantic 请求/响应模型

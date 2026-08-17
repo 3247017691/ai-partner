@@ -4,7 +4,7 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas import ApiResponse
-from db import get_db_session, AiPreset
+from app.db import get_db_session, AiPreset
 
 
 router = APIRouter(prefix='/api', tags=['预设信息'])
