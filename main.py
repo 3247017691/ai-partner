@@ -246,11 +246,11 @@ async def session_find(session_name: str, db_session:AsyncSession = Depends(get_
     # 4.封装会话数据（jsonable_encoder 将 ORM 对象转为可 JSON 序列化的字典，datetime 字段一并处理）
     messages_data = jsonable_encoder(session_data)
     messages_data["messages"] = jsonable_encoder(messages_list)
-    # 5.组装返回结果
+    # 5.组装返回结果（从已转为 dict 的 messages_data 中取值，ORM 对象不支持下标访问）
     session_data = {
-        "session_name": session_data["session_name"],
-        "nick_name": session_data["nick_name"],
-        "nature": session_data["nature"],
+        "session_name": messages_data["session_name"],
+        "nick_name": messages_data["nick_name"],
+        "nature": messages_data["nature"],
         "messages": messages_data["messages"]
     }
     # 5.返回响应，数据为会话数据（含消息列表）
