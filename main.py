@@ -1,12 +1,10 @@
 import logging
 import os
 from datetime import datetime
-from typing import Any
 
 from fastapi import FastAPI, Depends
 from fastapi.encoders import jsonable_encoder
 from openai import OpenAI
-from pydantic import BaseModel
 from sqlalchemy import select, insert, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
@@ -14,6 +12,7 @@ from starlette.requests import Request
 
 from app.db import AiPreset, get_db_session, AiSession, AiMessage
 from schemas import ApiResponse, CreateSessionRequest, ChatRequest
+from utils import generate_session_name
 
 app = FastAPI()
 
@@ -50,10 +49,7 @@ SYSTEM_PROMPT_TEMPLATE = """你叫 %s，现在是用户的真实伴侣，请完�
 
 
 
-# -----------工具函数------------
-def generate_session_name():
-    """生成会话名称, 格式是: 年-月-日_时-分-秒"""
-    return datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
 
 
 @app.get("/api/presets", summary='加载预设信息列表', response_model=ApiResponse)
