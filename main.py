@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from fastapi import FastAPI, Request, Depends
 from fastapi.encoders import jsonable_encoder
 from typing import Any
@@ -256,6 +256,7 @@ async def session_find(session_name: str, db_session:AsyncSession = Depends(get_
     # 5.返回响应，数据为会话数据（含消息列表）
     return ApiResponse(data=session_data)
 
+
 @app.delete("/api/sessions/{session_name}", summary="删除指定会话", response_model=ApiResponse)
 async def session_delete(session_name: str, db_session:AsyncSession = Depends(get_db_session)):
     """
@@ -284,7 +285,7 @@ async def session_delete(session_name: str, db_session:AsyncSession = Depends(ge
 
 
 @app.post('/api/chat', summary="AI伴侣聊天")
-async def chat(request: ChatRequest) -> ApiResponse:
+async def chat(request: ChatRequest, db_session:AsyncSession = Depends(get_db_session)) -> ApiResponse:
     """
     处理 AI 伴侣聊天请求。
 
@@ -299,41 +300,45 @@ async def chat(request: ChatRequest) -> ApiResponse:
     """
     logging.info(f"与AI交互:{request.session_name} : {request.message}")
     # 1.从会话session_name.json文件中读取会话数据
-    session_path = get_session_path(request.session_name)
-    if not os.path.exists(session_path):
+    session_result = await db_session.execute(select(AiSession).where(AiSession.session_name == request.session_name))
+    session_data = session_result.scalars().first()
+    if session_data is None:
         return ApiResponse(code=404, message="会话不存在")
-    with open(session_path, 'r', encoding='utf-8') as f:
-        session_data = json.load(f)
-
+    messages_result = await db_session.execute(
+        select(AiMessage.role, AiMessage.content).where(AiMessage.session_id == session_data.id).order_by(AiMessage.create_time.asc())
+    )
+    # mappings() 返回的是 RowMapping 对象，需显式转为 dict 才能与消息列表拼接
+    history_messages = [dict(row) for row in messages_result.mappings().all()]
     # 2.拼接系统提示词
     system_prompt = SYSTEM_PROMPT_TEMPLATE % (request.nick_name, request.nature)
 
     # 3.构建消息列表
-    history = session_data.get("messages", [])
-    messages = [{"role": "system", "content": system_prompt}]
-    for message in history:
-        messages.append(message)
-    messages.append({"role": "user", "content": request.message})
+    messages_list = [{"role": "system", "content": system_prompt}]  ##系统提示词
+    messages_list += history_messages  # 历史聊天记录
+    messages_list.append({"role": "user", "content": request.message})
 
     # 4.调用Deepseek API进行聊天
     response = client.chat.completions.create(
         model="deepseek-v4-flash",
-        messages=messages,
+        messages=messages_list,
         stream=False
     )
     # 5. 获取响应的数据
     ai_response = response.choices[0].message.content
     logging.info(f"AI回复:{ai_response}")
 
-    # 6. 更新消息列表中的消息
-    messages.pop(0)
-    messages.append({"role": "assistant", "content": ai_response})
-    session_data["messages"] = messages
-    logging.info(f"会话数据:{session_data}")
+    # 6. 将本轮用户消息与 AI 回复写入消息表（add_all 为同步方法，不可 await）
+    now = datetime.now()
+    db_session.add_all([
+        AiMessage(session_id=session_data.id, role="user", content=request.message, create_time=now),
+        AiMessage(session_id=session_data.id, role="assistant", content=ai_response, create_time=now),
+    ])
 
-    # 7. 保存会话信息到json文件中
-    with open(session_path, 'w', encoding='utf-8') as f:
-        json.dump(session_data, f, ensure_ascii=False, indent=4)
+    # 7. 更新会话的更新时间并保存会话信息到SQL中
+    await db_session.execute(
+        update(AiSession).where(AiSession.id == session_data.id).values(update_time=now)
+    )
+    await db_session.commit()
 
     # 8.返回响应，数据为AI的回复内容
     return ApiResponse(data=ai_response)
