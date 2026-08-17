@@ -13,6 +13,7 @@ from starlette.responses import JSONResponse
 from starlette.requests import Request
 
 from app.db import AiPreset, get_db_session, AiSession, AiMessage
+from schemas import ApiResponse, CreateSessionRequest, ChatRequest
 
 app = FastAPI()
 
@@ -47,23 +48,6 @@ SYSTEM_PROMPT_TEMPLATE = """你叫 %s，现在是用户的真实伴侣，请完�
     """
 
 
-# -----------数据模型类-------
-class ApiResponse(BaseModel):
-    code: int = 200
-    message: str = '操作成功'
-    data: Any = None  # data允许任意类型的数据, 且有默认值为None
-
-
-class CreateSessionRequest(BaseModel):
-    nick_name: str
-    nature: str
-
-
-class ChatRequest(BaseModel):
-    session_name: str
-    message: str
-    nick_name: str
-    nature: str
 
 
 # -----------工具函数------------
