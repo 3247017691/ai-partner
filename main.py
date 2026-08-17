@@ -334,10 +334,10 @@ async def chat(request: ChatRequest, db_session:AsyncSession = Depends(get_db_se
         AiMessage(session_id=session_data.id, role="assistant", content=ai_response, create_time=now),
     ])
 
-    # 7. 更新会话的更新时间并保存会话信息到SQL中
-    await db_session.execute(
-        update(AiSession).where(AiSession.id == session_data.id).values(update_time=now)
-    )
+    # 更新性格,昵称
+    session_data.nature = request.nature
+    session_data.nick_name = request.nick_name
+
     await db_session.commit()
 
     # 8.返回响应，数据为AI的回复内容
