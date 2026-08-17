@@ -334,9 +334,10 @@ async def chat(request: ChatRequest, db_session:AsyncSession = Depends(get_db_se
         AiMessage(session_id=session_data.id, role="assistant", content=ai_response, create_time=now),
     ])
 
-    # 更新性格,昵称
+    # 7. 更新会话信息
     session_data.nature = request.nature
     session_data.nick_name = request.nick_name
+    session_data.update_time = now
 
     await db_session.commit()
 
